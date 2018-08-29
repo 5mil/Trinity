@@ -55,15 +55,6 @@ public:
         
         //// debug print
         hashGenesisBlock = genesis.GetHash();
-       while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SCRYPT].getuint256()){
-            if (++genesis.nNonce==0) break;
-            hashGenesisBlock = genesis.GetHash();
-        }
-
-        printf("MAIN: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        printf("%x\n", bnProofOfWorkLimit[ALGO_SHA256D].GetCompact());
-        genesis.print();
 
         assert(hashGenesisBlock == uint256("0x000003070f466e13150a395e05856c99c5f70f9934e1d1cc0aa6dd8024de7743"));
         assert(genesis.hashMerkleRoot == uint256("0xda9dc50395fb1134b8bf04ffff1963ee78b1d7c4b423466b85a5ed352ded5cf5"));
@@ -126,15 +117,6 @@ public:
         
         //// debug print
         hashGenesisBlock = genesis.GetHash();
-       while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SHA256D].getuint256()){
-            if (++genesis.nNonce==0) break;
-           hashGenesisBlock = genesis.GetHash();
-        }
-
-        printf("TEST: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        genesis.print();
-        
         assert(hashGenesisBlock == uint256("0x000003070f466e13150a395e05856c99c5f70f9934e1d1cc0aa6dd8024de7743"));
 
         vFixedSeeds.clear();
@@ -175,14 +157,6 @@ public:
         
         //// debug print
         hashGenesisBlock = genesis.GetHash();
-        while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SHA256D].getuint256()){
-            if (++genesis.nNonce==0) break;
-           hashGenesisBlock = genesis.GetHash();
-        }
-
-        printf("REG: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        genesis.print();
 
        // assert(hashGenesisBlock == uint256("0x"));
 

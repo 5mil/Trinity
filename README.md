@@ -11,17 +11,6 @@ Specifications
 ------------------
 
 - Proof of Work based. Mine using any of the 3 algorithms : sha256d(default), scrypt or groestl.
-- Difficulty is retargeted every 2 blocks.
-- 1 Minute Block Time
-- 1,680,000 Blocks
-- Random Coins per Block Based on Probability
-	-Block Rewards:
-	- 61.5% chance of the reward being 1
-	- 20% chance of the reward being 2
-	- 10% chance of the reward being 5
-	- 5% chance of the reward being 10
-	- 2.5% chance of the reward being 20
-	- 1% chance of the reward being 50
 
 License
 -------
