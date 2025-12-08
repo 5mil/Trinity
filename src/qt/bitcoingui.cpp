@@ -25,6 +25,7 @@
 #include "ui_interface.h"
 #include "wallet.h"
 #include "init.h"
+#include "gamifiedminingdialog.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
@@ -261,12 +262,17 @@ void BitcoinGUI::createActions(bool fIsTestnet)
 
     openRPCConsoleAction = new QAction(QIcon(":/icons/debugwindow"), tr("&Debug window"), this);
     openRPCConsoleAction->setStatusTip(tr("Open debugging and diagnostic console"));
+    
+    gamifiedMiningAction = new QAction(QIcon(":/icons/bitcoin"), tr("⛏️ &Solo Mining Adventure..."), this);
+    gamifiedMiningAction->setStatusTip(tr("Open gamified solo mining interface with visual difficulty and probability calculator"));
+    gamifiedMiningAction->setCheckable(false);
 
     connect(quitAction, SIGNAL(triggered()), qApp, SLOT(quit()));
     connect(aboutAction, SIGNAL(triggered()), this, SLOT(aboutClicked()));
     connect(aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
     connect(optionsAction, SIGNAL(triggered()), this, SLOT(optionsClicked()));
     connect(toggleHideAction, SIGNAL(triggered()), this, SLOT(toggleHidden()));
+    connect(gamifiedMiningAction, SIGNAL(triggered()), this, SLOT(gamifiedMiningClicked()));
     connect(encryptWalletAction, SIGNAL(triggered(bool)), walletFrame, SLOT(encryptWallet(bool)));
     connect(backupWalletAction, SIGNAL(triggered()), walletFrame, SLOT(backupWallet()));
     connect(changePassphraseAction, SIGNAL(triggered()), walletFrame, SLOT(changePassphrase()));
@@ -295,6 +301,8 @@ void BitcoinGUI::createMenuBar()
     QMenu *settings = appMenuBar->addMenu(tr("&Settings"));
     settings->addAction(encryptWalletAction);
     settings->addAction(changePassphraseAction);
+    settings->addSeparator();
+    settings->addAction(gamifiedMiningAction);
     settings->addSeparator();
     settings->addAction(optionsAction);
 
@@ -461,6 +469,19 @@ void BitcoinGUI::aboutClicked()
     AboutDialog dlg;
     dlg.setModel(clientModel);
     dlg.exec();
+}
+
+void BitcoinGUI::gamifiedMiningClicked()
+{
+    if (!clientModel) {
+        return;
+    }
+    
+    GamifiedMiningDialog *dlg = new GamifiedMiningDialog(this);
+    dlg->setClientModel(clientModel);
+    dlg->setWalletModel(walletFrame->currentWalletModel());
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->show();
 }
 
 void BitcoinGUI::gotoOverviewPage()

@@ -150,6 +150,10 @@ void RandAddSeed();
 void RandAddSeedPerfmon();
 int ATTR_WARN_PRINTF(1,2) OutputDebugStringF(const char* pszFormat, ...);
 
+// Categorized logging support
+int LogPrint(const char* category, const char* pszFormat, ...) ATTR_WARN_PRINTF(2,3);
+int LogPrintf(const char* pszFormat, ...) ATTR_WARN_PRINTF(1,2);
+
 /*
   Rationale for the real_strprintf / strprintf construction:
     It is not allowed to use va_start with a pass-by-reference argument.
@@ -217,6 +221,8 @@ void ShrinkDebugFile();
 int GetRandInt(int nMax);
 uint64 GetRand(uint64 nMax);
 uint256 GetRandHash();
+void GetRandBytes(unsigned char* buf, int num);
+void GetStrongRandBytes(unsigned char* buf, int num);
 int64 GetTime();
 void SetMockTime(int64 nMockTimeIn);
 int64 GetAdjustedTime();
@@ -224,6 +230,7 @@ int64 GetTimeOffset();
 long hex2long(const char* hexString);
 std::string FormatFullVersion();
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments);
+std::string SanitizeString(const std::string& str);
 void AddTimeData(const CNetAddr& ip, int64 nTime);
 void runCommand(std::string strCommand);
 

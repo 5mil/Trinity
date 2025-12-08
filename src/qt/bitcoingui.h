@@ -102,6 +102,7 @@ private:
     QAction *changePassphraseAction;
     QAction *aboutQtAction;
     QAction *openRPCConsoleAction;
+    QAction *gamifiedMiningAction;
 
     QSystemTrayIcon *trayIcon;
     Notificator *notificator;
@@ -181,6 +182,8 @@ private slots:
     void optionsClicked();
     /** Show about dialog */
     void aboutClicked();
+    /** Show gamified solo mining dialog */
+    void gamifiedMiningClicked();
 #ifndef Q_OS_MAC
     /** Handle tray icon clicked */
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);

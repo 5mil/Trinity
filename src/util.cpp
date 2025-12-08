@@ -21,6 +21,9 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+#include <boost/algorithm/string/split.hpp> // for split()
+#include <boost/algorithm/string/trim.hpp> // for trim()
+#include <boost/algorithm/string/classification.hpp> // for is_any_of()
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is neither visible in the template definition nor found by argument-dependent lookup
@@ -84,6 +87,9 @@ bool fLogTimestamps = false;
 CMedianFilter<int64> vTimeOffsets(200,0);
 volatile bool fReopenDebugLog = false;
 bool fCachedPath[2] = {false, false};
+
+// Categorized logging
+static std::map<std::string, bool> mapDebugCategories;
 
 // Init OpenSSL library multithreading support
 static CCriticalSection** ppmutexOpenSSL;
@@ -198,6 +204,39 @@ uint256 GetRandHash()
     return hash;
 }
 
+void GetRandBytes(unsigned char* buf, int num)
+{
+    if (RAND_bytes(buf, num) != 1) {
+        LogPrintf("GetRandBytes: OpenSSL RAND_bytes() failed with error.\n");
+    }
+}
+
+void GetStrongRandBytes(unsigned char* buf, int num)
+{
+    // Use OpenSSL's random number generator, which is cryptographically secure
+    if (RAND_bytes(buf, num) != 1) {
+        LogPrintf("GetStrongRandBytes: OpenSSL RAND_bytes() failed.\n");
+        // Fallback to system entropy if available
+        #ifndef WIN32
+        FILE* f = fopen("/dev/urandom", "r");
+        if (f) {
+            size_t bytesRead = fread(buf, 1, num, f);
+            fclose(f);
+            if (bytesRead != (size_t)num) {
+                // Critical failure - could not get random bytes
+                LogPrintf("GetStrongRandBytes: Failed to read %d bytes from /dev/urandom (got %zu).\n", num, bytesRead);
+                // As a last resort, mix in some data, but this is not ideal
+                for (int i = 0; i < num; i++) {
+                    buf[i] ^= (GetTime() >> (i % 8)) & 0xFF;
+                }
+            }
+        } else {
+            LogPrintf("GetStrongRandBytes: Failed to open /dev/urandom.\n");
+        }
+        #endif
+    }
+}
+
 
 
 
@@ -235,6 +274,159 @@ static void DebugPrintInit()
 
 int OutputDebugStringF(const char* pszFormat, ...)
 {
+    int ret = 0; // Returns total number of characters written
+    if (fPrintToConsole)
+    {
+        // print to console
+        va_list arg_ptr;
+        va_start(arg_ptr, pszFormat);
+        ret += vprintf(pszFormat, arg_ptr);
+        va_end(arg_ptr);
+    }
+    else if (!fPrintToDebugger)
+    {
+        static bool fStartedNewLine = true;
+        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
+
+        if (fileout == NULL)
+            return ret;
+
+        boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+
+        // reopen the log file, if requested
+        if (fReopenDebugLog) {
+            fReopenDebugLog = false;
+            boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+            if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
+                setbuf(fileout, NULL); // unbuffered
+        }
+
+        // Debug print useful for profiling
+        if (fLogTimestamps && fStartedNewLine)
+            ret += fprintf(fileout, "%s ", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()).c_str());
+        if (pszFormat[strlen(pszFormat) - 1] == '\n')
+            fStartedNewLine = true;
+        else
+            fStartedNewLine = false;
+
+        va_list arg_ptr;
+        va_start(arg_ptr, pszFormat);
+        ret += vfprintf(fileout, pszFormat, arg_ptr);
+        va_end(arg_ptr);
+    }
+
+#ifdef WIN32
+    if (fPrintToDebugger)
+    {
+        static CCriticalSection cs_OutputDebugStringF;
+
+        // accumulate and output a line at a time
+        {
+            LOCK(cs_OutputDebugStringF);
+            static std::string buffer;
+
+            va_list arg_ptr;
+            va_start(arg_ptr, pszFormat);
+            buffer += vstrprintf(pszFormat, arg_ptr);
+            va_end(arg_ptr);
+
+            int line_start = 0, line_end;
+            while((line_end = buffer.find('\n', line_start)) != -1)
+            {
+                OutputDebugStringA(buffer.substr(line_start, line_end - line_start).c_str());
+                line_start = line_end + 1;
+                ret += line_end-line_start;
+            }
+            buffer.erase(0, line_start);
+        }
+    }
+#endif
+    return ret;
+}
+
+int LogPrintf(const char* pszFormat, ...)
+{
+    int ret = 0; // Returns total number of characters written
+    if (fPrintToConsole)
+    {
+        // print to console
+        va_list arg_ptr;
+        va_start(arg_ptr, pszFormat);
+        ret += vprintf(pszFormat, arg_ptr);
+        va_end(arg_ptr);
+    }
+    else if (!fPrintToDebugger)
+    {
+        static bool fStartedNewLine = true;
+        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
+
+        if (fileout == NULL)
+            return ret;
+
+        boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+
+        // reopen the log file, if requested
+        if (fReopenDebugLog) {
+            fReopenDebugLog = false;
+            boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+            if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
+                setbuf(fileout, NULL); // unbuffered
+        }
+
+        // Debug print useful for profiling
+        if (fLogTimestamps && fStartedNewLine)
+            ret += fprintf(fileout, "%s ", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()).c_str());
+        if (pszFormat[strlen(pszFormat) - 1] == '\n')
+            fStartedNewLine = true;
+        else
+            fStartedNewLine = false;
+
+        va_list arg_ptr;
+        va_start(arg_ptr, pszFormat);
+        ret += vfprintf(fileout, pszFormat, arg_ptr);
+        va_end(arg_ptr);
+    }
+
+#ifdef WIN32
+    if (fPrintToDebugger)
+    {
+        static CCriticalSection cs_OutputDebugStringF;
+
+        // accumulate and output a line at a time
+        {
+            LOCK(cs_OutputDebugStringF);
+            static std::string buffer;
+
+            va_list arg_ptr;
+            va_start(arg_ptr, pszFormat);
+            buffer += vstrprintf(pszFormat, arg_ptr);
+            va_end(arg_ptr);
+
+            int line_start = 0, line_end;
+            while((line_end = buffer.find('\n', line_start)) != -1)
+            {
+                OutputDebugStringA(buffer.substr(line_start, line_end - line_start).c_str());
+                line_start = line_end + 1;
+                ret += line_end-line_start;
+            }
+            buffer.erase(0, line_start);
+        }
+    }
+#endif
+    return ret;
+}
+
+int LogPrint(const char* category, const char* pszFormat, ...)
+{
+    // Check for null or empty category
+    if (!category || category[0] == '\0')
+        return 0;
+        
+    // Check if category is enabled
+    if (!fDebug && mapDebugCategories.count(category) == 0) {
+        return 0;
+    }
+
     int ret = 0; // Returns total number of characters written
     if (fPrintToConsole)
     {
@@ -566,6 +758,24 @@ void ParseParameters(int argc, const char* const argv[])
 
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
         InterpretNegativeSetting(name, mapArgs);
+    }
+    
+    // Initialize debug categories
+    if (mapArgs.count("-debug")) {
+        std::string strDebug = mapArgs["-debug"];
+        if (strDebug.empty() || strDebug == "1") {
+            fDebug = true;
+        } else if (strDebug != "0") {
+            // Parse comma-separated list of debug categories
+            std::vector<std::string> categories;
+            boost::split(categories, strDebug, boost::is_any_of(","));
+            BOOST_FOREACH(std::string cat, categories) {
+                boost::trim(cat);
+                if (!cat.empty()) {
+                    mapDebugCategories[cat] = true;
+                }
+            }
+        }
     }
 }
 
@@ -1439,6 +1649,36 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
         ss << "(" << boost::algorithm::join(comments, "; ") << ")";
     ss << "/";
     return ss.str();
+}
+
+std::string SanitizeString(const std::string& str)
+{
+    /**
+    * Sanitize a string to prevent any potentially dangerous characters
+    * that could be used in injection attacks or cause parsing issues.
+    * This is a non-consensus change that improves security.
+    */
+    std::string strResult;
+    strResult.reserve(str.size());
+    for (std::string::const_iterator it = str.begin(); it != str.end(); ++it)
+    {
+        if (*it >= 0x20 && *it < 0x7f)
+        {
+            // Allow printable ASCII characters
+            strResult += *it;
+        }
+        else if (*it == '\n' || *it == '\r' || *it == '\t')
+        {
+            // Allow common whitespace
+            strResult += *it;
+        }
+        else
+        {
+            // Replace other characters with '?'
+            strResult += '?';
+        }
+    }
+    return strResult;
 }
 
 #ifdef WIN32
